@@ -74,6 +74,9 @@ PATCHIP=$(printf '\\x%02x\\x%02x\\x%02x\n' $(echo "$IP" | grep -o [0-9]* | head 
 # set version name
 VERSIONNAME="NONE"
 
+# set link to RaGEZONE thread
+THREADLINK="NONE"
+
 # make sure that vsyscall is emulate
 if [ "$(cat /proc/cmdline | grep vsyscall=emulate)" == "" ] ; then
 	sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"vsyscall=emulate /g" "/etc/default/grub"
@@ -82,7 +85,7 @@ if [ "$(cat /proc/cmdline | grep vsyscall=emulate)" == "" ] ; then
 fi
 
 # --------------------------------------------------
-# yokohiro - 010.004.01.02
+# yokohiro - 007.010.01.02
 # --------------------------------------------------
 if [ "$AKVERSION" = 1 ] ; then
 	cd "/root/hxsy"
@@ -144,6 +147,7 @@ if [ "$AKVERSION" = 1 ] ; then
 	# setup info
 	VERSIONNAME="yokohiro - 007.010.01.02"
 	CREDITS="yokohiro, Eperty123 and WangWeiJing1262"
+	THREADLINK="https://forum.ragezone.com/f937/aura-kingdom-release-files-v7-1191652/"
 fi
 
 # --------------------------------------------------
@@ -209,6 +213,7 @@ if [ "$AKVERSION" = 2 ] ; then
 	# setup info
 	VERSIONNAME="wangweijing1262 - 007.004.01.02"
 	CREDITS="WangWeiJing1262"
+	THREADLINK="https://forum.ragezone.com/f937/release-frostblock-shinobi-server-1188329/"
 fi
 
 # --------------------------------------------------
@@ -280,6 +285,7 @@ if [ "$AKVERSION" = 3 ] ; then
 	# setup info
 	VERSIONNAME="yokohiro - 003.005.01.04"
 	CREDITS="yokohiro, genz and Eperty123"
+	THREADLINK="https://forum.ragezone.com/f937/aura-kingdom-release-files-1158070/"
 fi
 
 # --------------------------------------------------
@@ -347,6 +353,7 @@ if [ "$AKVERSION" = 4 ] ; then
 	# setup info
 	VERSIONNAME="genz - 003.005.01.04"
 	CREDITS="genz and Eperty123"
+	THREADLINK="https://forum.ragezone.com/f938/centos-setting-aura-kingdom-server-1076106/index51.html#post8673790"
 fi
 
 # --------------------------------------------------
@@ -410,6 +417,7 @@ if [ "$AKVERSION" = 5 ] ; then
 	# setup info
 	VERSIONNAME="eperty123 - 003.005.01.04"
 	CREDITS="Eperty123"
+	THREADLINK="https://forum.ragezone.com/f938/centos-setting-up-your-aura-1076106/"
 fi
 
 # --------------------------------------------------
@@ -477,6 +485,7 @@ if [ "$AKVERSION" = 6 ] ; then
 	# setup info
 	VERSIONNAME="hycker - 003.005.01.03"
 	CREDITS="Hycker"
+	THREADLINK="https://forum.ragezone.com/f937/release-aura-kingdom-hk-patched-1092741/"
 fi
 
 if [ "$VERSIONNAME" = "NONE" ] ; then
@@ -497,6 +506,7 @@ else
 	echo -e "Database password: $DBPASS"
 	echo -e "Server path: /root/hxsy/"
 	echo -e "Postgresql configuration path: /etc/postgresql/$POSTGRESQLVERSION/main/"
+	echo -e "Release info / Client download: $THREADLINK"
 	echo -e "\nMake sure to thank $CREDITS!"
 	echo -e "\nTo start the server, please run /root/hxsy/start"
 	echo -e "To stop the server, please run /root/hxsy/stop${RC}"
