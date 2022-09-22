@@ -1,20 +1,15 @@
-#!/bin/sh
+#!/bin/bash
 
 # define colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-LRED='\033[1;31m'
-LGREEN='\033[1;32m'
-RC='\033[0m'
+RED='\e[0;31m'
+GREEN='\e[1;32m'
+RC='\e[0m'
 
 # make sure lists are up to date
 apt-get -qq update
 
 # install sudo in case it is missing
 apt-get -qq install sudo -y
-
-# make sure that ifconfig works
-sudo apt-get -qq install net-tools
 
 # test for the main folder
 if [ -d "/root/hxsy" ] ; then
@@ -30,20 +25,20 @@ mkdir "/root/hxsy" -m 777
 cd "/root/hxsy"
 
 # get ip info; select ip
-EXTIP=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
-if [ "$EXTIP" != "" ] ; then
-	echo "Select your IP:\n1) External IP: $EXTIP\n2) Input other IP"
+IP=$(ip a | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
+if [ "$IP" != "" ] ; then
+	echo -e "Select your IP:\n1) IP: $IP\n2) Input other IP"
 	read INVAR
 else
 	INVAR="2"
 fi
 if [ "$INVAR" = "2" ] ; then
 	echo "Please enter IP:"
-	read EXTIP
+	read IP
 fi
 
 # select server version
-echo "Select the version you want to install.\n1) yokohiro - 007.010.01.02 (recommended)\n2) wangweijing1262 - 007.004.01.02\n3) yokohiro - 003.005.01.04\n4) genz - 003.005.01.04\n5) eperty123 - 003.005.01.04\n6) hycker - 003.005.01.03"
+echo -e "Select the version you want to install.\n1) yokohiro - 007.010.01.02 (recommended)\n2) wangweijing1262 - 007.004.01.02\n3) yokohiro - 003.005.01.04\n4) genz - 003.005.01.04\n5) eperty123 - 003.005.01.04\n6) hycker - 003.005.01.03"
 read AKVERSION
 
 # make sure start / stop commands are working
@@ -57,7 +52,7 @@ sudo apt-get -qq install unzip -y
 
 # install postgresql in case it is missing
 sudo apt-get -qq install postgresql -y
-POSTGRESQLVERSION=$(psql --version | grep -Eo '[0-9].[0-9]' | head -n1)
+POSTGRESQLVERSION=$(psql --version | cut -c 19-20)
 
 # install pwgen in case it is missing
 sudo apt-get -qq install pwgen -y
@@ -74,13 +69,23 @@ sed -i "s+host    all             all             127.0.0.1/32            md5+ho
 sudo -u postgres psql -c "ALTER user postgres WITH password '$DBPASS';"
 
 # ready ip for hexpatch
-PATCHIP=$(printf '\\x%02x\\x%02x\\x%02x\n' $(echo "$EXTIP" | grep -o [0-9]* | head -n1) $(echo "$EXTIP" | grep -o [0-9]* | head -n2 | tail -n1) $(echo "$EXTIP" | grep -o [0-9]* | head -n3 | tail -n1))
+PATCHIP=$(printf '\\x%02x\\x%02x\\x%02x\n' $(echo "$IP" | grep -o [0-9]* | head -n1) $(echo "$IP" | grep -o [0-9]* | head -n2 | tail -n1) $(echo "$IP" | grep -o [0-9]* | head -n3 | tail -n1))
 
 # set version name
 VERSIONNAME="NONE"
 
+# set link to RaGEZONE thread
+THREADLINK="NONE"
+
+# make sure that vsyscall is emulate
+if [ "$(cat /proc/cmdline | grep vsyscall=emulate)" == "" ] ; then
+	sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"vsyscall=emulate /g" "/etc/default/grub"
+	sudo update-grub
+	VSYSCALLWARNING="You have to reboot your system before starting the server, please run ${RED}sudo reboot${RC}"
+fi
+
 # --------------------------------------------------
-# yokohiro - 010.004.01.02
+# yokohiro - 007.010.01.02
 # --------------------------------------------------
 if [ "$AKVERSION" = 1 ] ; then
 	cd "/root/hxsy"
@@ -93,14 +98,17 @@ if [ "$AKVERSION" = 1 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
 	unzip "server.zip"
 	rm -f "server.zip"
-	sed -i "s/192.168.178.59/$EXTIP/g" "GatewayServer/setup.ini"
+	sed -i "s/192.168.178.59/$IP/g" "GatewayServer/setup.ini"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "GatewayServer/setup.ini"
-	sed -i "s/192.168.178.59/$EXTIP/g" "TicketServer/setup.ini"
+	sed -i "s/192.168.178.59/$IP/g" "TicketServer/setup.ini"
 	sed -i "s/\xc0\xa8\xb2/$PATCHIP/g" "WorldServer/WorldServer"
 	sed -i "s/\xc0\xa8\xb2/$PATCHIP/g" "ZoneServer/ZoneServer"
 	
@@ -125,8 +133,8 @@ if [ "$AKVERSION" = 1 ] ; then
 	sudo -u postgres psql -d ffaccount -c "\i '/root/hxsy/SQL/FFAccount.bak';"
 	sudo -u postgres psql -d ffdb1 -c "\i '/root/hxsy/SQL/FFDB1.bak';"
 	sudo -u postgres psql -d ffmember -c "\i '/root/hxsy/SQL/FFMember.bak';"
-	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.178.59';"
-	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.178.59';"
+	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.178.59';"
+	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.178.59';"
 	
 	# remove server setup files
 	rm -f yokohiro_007_010_01_02
@@ -139,6 +147,7 @@ if [ "$AKVERSION" = 1 ] ; then
 	# setup info
 	VERSIONNAME="yokohiro - 007.010.01.02"
 	CREDITS="yokohiro, Eperty123 and WangWeiJing1262"
+	THREADLINK="https://forum.ragezone.com/f937/aura-kingdom-release-files-v7-1191652/"
 fi
 
 # --------------------------------------------------
@@ -155,14 +164,17 @@ if [ "$AKVERSION" = 2 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
 	unzip "server.zip"
 	rm -f "server.zip"
-	sed -i "s/192.168.178.59/$EXTIP/g" "GatewayServer/setup.ini"
+	sed -i "s/192.168.178.59/$IP/g" "GatewayServer/setup.ini"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "GatewayServer/setup.ini"
-	sed -i "s/192.168.178.59/$EXTIP/g" "TicketServer/setup.ini"
+	sed -i "s/192.168.178.59/$IP/g" "TicketServer/setup.ini"
 	sed -i "s/\xc0\xa8\xb2/$PATCHIP/g" "WorldServer/WorldServer"
 	sed -i "s/\xc0\xa8\xb2/$PATCHIP/g" "ZoneServer/ZoneServer"
 	
@@ -187,8 +199,8 @@ if [ "$AKVERSION" = 2 ] ; then
 	sudo -u postgres psql -d ffaccount -c "\i '/root/hxsy/SQL/FFAccount.bak';"
 	sudo -u postgres psql -d ffdb1 -c "\i '/root/hxsy/SQL/FFDB1.bak';"
 	sudo -u postgres psql -d ffmember -c "\i '/root/hxsy/SQL/FFMember.bak';"
-	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.178.59';"
-	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.178.59';"
+	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.178.59';"
+	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.178.59';"
 	
 	# remove server setup files
 	rm -f wangweijing1262_007_004_01_02
@@ -201,6 +213,7 @@ if [ "$AKVERSION" = 2 ] ; then
 	# setup info
 	VERSIONNAME="wangweijing1262 - 007.004.01.02"
 	CREDITS="WangWeiJing1262"
+	THREADLINK="https://forum.ragezone.com/f937/release-frostblock-shinobi-server-1188329/"
 fi
 
 # --------------------------------------------------
@@ -217,14 +230,17 @@ if [ "$AKVERSION" = 3 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/123456/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
 	unzip "server.zip"
 	rm -f "server.zip"
-	sed -i "s/192.168.0.33/$EXTIP/g" "GatewayServer/setup.ini"
+	sed -i "s/192.168.0.33/$IP/g" "GatewayServer/setup.ini"
 	sed -i "s/123456/$DBPASS/g" "GatewayServer/setup.ini"
-	sed -i "s/192.168.0.33/$EXTIP/g" "TicketServer/setup.ini"
+	sed -i "s/192.168.0.33/$IP/g" "TicketServer/setup.ini"
 	sed -i "s/\xff\x3d\xc0\xa8\x00/\xff\x3d$PATCHIP/g" "WorldServer101/WorldServer101"
 	sed -i "s/\xff\x3d\xc0\xa8\x00/\xff\x3d$PATCHIP/g" "WorldServer102/WorldServer102"
 	sed -i "s/\xff\x3d\xc0\xa8\x00/\xff\x3d$PATCHIP/g" "ZoneServer101/ZoneServer101"
@@ -255,8 +271,8 @@ if [ "$AKVERSION" = 3 ] ; then
 	sudo -u postgres psql -d ffdb1 -c "\i '/root/hxsy/SQL/FFDB1.sql';"
 	sudo -u postgres psql -d ffmember -c "\i '/root/hxsy/SQL/FFMember.sql';"
 	sudo -u postgres psql -d itemmall -c "\i '/root/hxsy/SQL/Itemmall.sql';"
-	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.198.129';"
-	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.198.129';"
+	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.198.129';"
+	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.198.129';"
 	
 	# remove server setup files
 	rm -f yokohiro_003_005_01_04
@@ -269,6 +285,7 @@ if [ "$AKVERSION" = 3 ] ; then
 	# setup info
 	VERSIONNAME="yokohiro - 003.005.01.04"
 	CREDITS="yokohiro, genz and Eperty123"
+	THREADLINK="https://forum.ragezone.com/f937/aura-kingdom-release-files-1158070/"
 fi
 
 # --------------------------------------------------
@@ -285,14 +302,17 @@ if [ "$AKVERSION" = 4 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
 	unzip "server.zip"
 	rm -f "server.zip"
-	sed -i "s/192.168.198.129/$EXTIP/g" "GatewayServer/setup.ini"
+	sed -i "s/192.168.198.129/$IP/g" "GatewayServer/setup.ini"
 	sed -i "s/xxxxxxxx/$DBPASS/g" "GatewayServer/setup.ini"
-	sed -i "s/192.168.198.129/$EXTIP/g" "TicketServer/setup.ini"
+	sed -i "s/192.168.198.129/$IP/g" "TicketServer/setup.ini"
 	sed -i "s/\xc0\xa8\xc6/$PATCHIP/g" "WorldServer/WorldServer"
 	sed -i "s/\xc0\xa8\xc6/$PATCHIP/g" "ZoneServer/ZoneServer"
 	
@@ -319,8 +339,8 @@ if [ "$AKVERSION" = 4 ] ; then
 	sudo -u postgres psql -d ffdb1 -c "\i '/root/hxsy/SQL/FFDB1.sql';"
 	sudo -u postgres psql -d ffmember -c "\i '/root/hxsy/SQL/FFMember.sql';"
 	sudo -u postgres psql -d itemmall -c "\i '/root/hxsy/SQL/Itemmall.sql';"
-	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.198.129';"
-	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.198.129';"
+	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.198.129';"
+	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.198.129';"
 	
 	# remove server setup files
 	rm -f genz_003_005_01_04
@@ -333,6 +353,7 @@ if [ "$AKVERSION" = 4 ] ; then
 	# setup info
 	VERSIONNAME="genz - 003.005.01.04"
 	CREDITS="genz and Eperty123"
+	THREADLINK="https://forum.ragezone.com/f938/centos-setting-aura-kingdom-server-1076106/index51.html#post8673790"
 fi
 
 # --------------------------------------------------
@@ -349,6 +370,9 @@ if [ "$AKVERSION" = 5 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/123/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
@@ -379,8 +403,8 @@ if [ "$AKVERSION" = 5 ] ; then
 	sudo -u postgres psql -d FFAccount -c "\i '/root/hxsy/SQL/FFAccount.sql';"
 	sudo -u postgres psql -d FFDB1 -c "\i '/root/hxsy/SQL/FFDB1.sql';"
 	sudo -u postgres psql -d FFMember -c "\i '/root/hxsy/SQL/FFMember.sql';"
-	sudo -u postgres psql -d FFAccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.1.99';"
-	sudo -u postgres psql -d FFDB1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.1.99';"
+	sudo -u postgres psql -d FFAccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.1.99';"
+	sudo -u postgres psql -d FFDB1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.1.99';"
 	
 	# remove server setup files
 	rm -f eperty123_003_005_01_04
@@ -393,6 +417,7 @@ if [ "$AKVERSION" = 5 ] ; then
 	# setup info
 	VERSIONNAME="eperty123 - 003.005.01.04"
 	CREDITS="Eperty123"
+	THREADLINK="https://forum.ragezone.com/f938/centos-setting-up-your-aura-1076106/"
 fi
 
 # --------------------------------------------------
@@ -409,14 +434,17 @@ if [ "$AKVERSION" = 6 ] ; then
 	unzip "config.zip"
 	rm -f "config.zip"
 	sed -i "s/hycker/$DBPASS/g" "setup.ini"
+	sed -i "2i\\
+	export LC_ALL=C\\
+	" "start"
 	
 	# subservers
 	wget --no-check-certificate --load-cookies "/tmp/cookies.txt" "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate "https://docs.google.com/uc?export=download&id=$SUBSERVERSID" -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$SUBSERVERSID" -O "server.zip" && rm -rf "/tmp/cookies.txt"
 	unzip "server.zip"
 	rm -f "server.zip"
-	sed -i "s/192.168.1.127/$EXTIP/g" "GatewayServer/setup.ini"
+	sed -i "s/192.168.1.127/$IP/g" "GatewayServer/setup.ini"
 	sed -i "s/hycker/$DBPASS/g" "GatewayServer/setup.ini"
-	sed -i "s/192.168.1.127/$EXTIP/g" "TicketServer/setup.ini"
+	sed -i "s/192.168.1.127/$IP/g" "TicketServer/setup.ini"
 	sed -i "s/\xc0\xa8\x01/$PATCHIP/g" "WorldServer101/WorldServer101"
 	sed -i "s/\xc0\xa8\x01/$PATCHIP/g" "WorldServer102/WorldServer102"
 	sed -i "s/\xc0\xa8\x01/$PATCHIP/g" "ZoneServer101/ZoneServer101"
@@ -443,8 +471,8 @@ if [ "$AKVERSION" = 6 ] ; then
 	sudo -u postgres psql -d ffaccount -c "\i '/root/hxsy/SQL/ffaccount.sql';"
 	sudo -u postgres psql -d ffdb1 -c "\i '/root/hxsy/SQL/ffdb1.sql';"
 	sudo -u postgres psql -d ffmember -c "\i '/root/hxsy/SQL/ffmember.sql';"
-	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$EXTIP' WHERE ip = '192.168.1.127';"
-	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$EXTIP' WHERE ext_address = '192.168.1.127';"
+	sudo -u postgres psql -d ffaccount -c "UPDATE worlds SET ip = '$IP' WHERE ip = '192.168.1.127';"
+	sudo -u postgres psql -d ffdb1 -c "UPDATE serverstatus SET ext_address = '$IP' WHERE ext_address = '192.168.1.127';"
 	
 	# remove server setup files
 	rm -f hycker_003_005_01_03
@@ -457,27 +485,32 @@ if [ "$AKVERSION" = 6 ] ; then
 	# setup info
 	VERSIONNAME="hycker - 003.005.01.03"
 	CREDITS="Hycker"
+	THREADLINK="https://forum.ragezone.com/f937/release-aura-kingdom-hk-patched-1092741/"
 fi
 
 if [ "$VERSIONNAME" = "NONE" ] ; then
 	# display error
-	echo "${RED}--------------------------------------------------"
-	echo "Installation failed!"
-	echo "--------------------------------------------------"
-	echo "The selected version could not be installed. Please try again and choose a different version.${RC}"
+	echo -e "${RED}--------------------------------------------------"
+	echo -e "Installation failed!"
+	echo -e "--------------------------------------------------"
+	echo -e "The selected version could not be installed. Please try again and choose a different version.${RC}"
 else
 	# display info screen
-	echo "${LGREEN}--------------------------------------------------"
-	echo "Installation complete!"
-	echo "--------------------------------------------------"
-	echo "Server version: $VERSIONNAME"
-	echo "Server IP: $EXTIP"
-	echo "Postgresql version: $POSTGRESQLVERSION"
-	echo "Database user: postgres"
-	echo "Database password: $DBPASS"
-	echo "Server path: /root/hxsy/"
-	echo "Postgresql configuration path: /etc/postgresql/$POSTGRESQLVERSION/main/"
-	echo "\nMake sure to thank $CREDITS!"
-	echo "\nTo start the server, please run /root/hxsy/start"
-	echo "To stop the server, please run /root/hxsy/stop${RC}"
+	echo -e "${GREEN}--------------------------------------------------"
+	echo -e "Installation complete!"
+	echo -e "--------------------------------------------------"
+	echo -e "Server version: $VERSIONNAME"
+	echo -e "Server IP: $IP"
+	echo -e "Postgresql version: $POSTGRESQLVERSION"
+	echo -e "Database user: postgres"
+	echo -e "Database password: $DBPASS"
+	echo -e "Server path: /root/hxsy/"
+	echo -e "Postgresql configuration path: /etc/postgresql/$POSTGRESQLVERSION/main/"
+	echo -e "Release info / Client download: $THREADLINK"
+	echo -e "\nMake sure to thank $CREDITS!"
+	echo -e "\nTo start the server, please run /root/hxsy/start"
+	echo -e "To stop the server, please run /root/hxsy/stop${RC}"
+	if [ "$VSYSCALLWARNING" != "" ] ; then
+		echo -e "\n$VSYSCALLWARNING"
+	fi
 fi
