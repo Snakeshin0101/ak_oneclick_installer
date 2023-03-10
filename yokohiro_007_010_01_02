@@ -4,6 +4,7 @@ MAINCONFIG="https://docs.google.com/uc?export=download&id=1enfYeI25FthVa8USb7qJE
 
 # subservers
 SUBSERVERSID="1JRgI2m5GeX9oDiA6062lsq0K3XsAcaoL"
+link down
 
 # Data folder
 DATAFOLDER="1KURduhD2lInP6Yo2KthqSMp_xqng7y8h"
